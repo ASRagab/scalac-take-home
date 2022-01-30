@@ -6,7 +6,8 @@ import zhttp.service.server.ServerChannelFactory
 import zio._
 
 object Main extends ZIOAppDefault {
-  val services = (Env.live ++ Client.live) >>> Backend.live >>> GithubService.live
+  val clientLayer = Environment.live ++ Client.live
+  val services = (Environment.live ++ Client.live) >>> Backend.live >>> GithubService.live
 
   val app: Http[GithubService, Throwable, Request, Response] = Http.collectZIO[Request] {
     case Method.GET -> !! / "org" / orgName / "contributors" =>
@@ -24,7 +25,7 @@ object Main extends ZIOAppDefault {
       .use { start =>
         Console.printLine(s"Server started on port ${start.port}") *> ZIO.never
       }
-      .provideCustom(EventLoopGroup.auto() ++ ServerChannelFactory.auto >>> services)
+      .provideCustom(services >>> ServerChannelFactory.auto ++ EventLoopGroup.auto())
       .exitCode
   }
 

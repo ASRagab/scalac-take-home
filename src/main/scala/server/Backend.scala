@@ -5,16 +5,16 @@ import sttp.client3.asynchttpclient.zio.AsyncHttpClientZioBackend
 import sttp.client3.logging.slf4j.Slf4jLoggingBackend
 import zio._
 
-trait Env {
+trait Environment {
   def token: Option[String]
 }
 
-object Env {
-  val live = ZLayer.succeed(new Env {
+object Environment {
+  val live = ZLayer.succeed(new Environment {
     override val token: Option[String] = Option(java.lang.System.getenv("GH_TOKEN"))
   })
 
-  val test = ZLayer.succeed(new Env {
+  val test = ZLayer.succeed(new Environment {
     override val token: Option[String] = Some("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")
   })
 }
@@ -36,10 +36,10 @@ trait Backend {
 }
 
 object Backend {
-  val live: URLayer[Client with Env, Backend] = ZLayer {
+  val live: URLayer[Client with Environment, Backend] = ZLayer {
     for {
       client <- ZIO.service[Client]
-      env    <- ZIO.service[Env]
+      env    <- ZIO.service[Environment]
     } yield new Backend {
       override def githubAPI: GithubAPI = new GithubAPI(client.httpClient, env.token)
     }
