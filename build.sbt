@@ -20,6 +20,7 @@ lazy val root = (project in file("."))
       "io.d11"                        %% "zhttp"                         % zhttpVersion,
       "io.d11"                        %% "zhttp-test"                    % zhttpVersion % Test,
       "dev.zio"                       %% "zio-test"                      % zioVersion   % Test,
+      "dev.zio"                       %% "zio-test-sbt"                  % zioVersion   % Test,
       "ch.qos.logback"                 % "logback-classic"               % "1.2.10"
     ),
     Compile / run / mainClass := Some("server.Main"),

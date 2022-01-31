@@ -1,6 +1,6 @@
 package client
 
-import client.GithubAPI._
+import client.GithubApi._
 import io.circe
 import io.circe.{Decoder, Encoder}
 import models.client.{Contributor, Repo}
@@ -14,9 +14,7 @@ import scala.concurrent.duration._
 import scala.util.chaining._
 import scala.util.matching.Regex
 
-class GithubAPI(ghClient: HttpClient, token: Option[String]) {
-
-  private[this] val gh = ghClient.toManaged
+class GithubApi(backend: HttpBackend, token: Option[String]) {
 
   /** First retrieve the list of repositories for the given org, then generate a list of page links to
     * @param orgName
@@ -68,42 +66,39 @@ class GithubAPI(ghClient: HttpClient, token: Option[String]) {
       if (links.isEmpty) uri
       else {
         links.head
+          .tap(link => logger.debug(s"Found last page: $link"))
           .split(",")
           .find(_.contains("rel=\"last\""))
           .flatMap(linkExtractor.findFirstIn)
           .flatMap(Uri.parse(_).toOption)
           .getOrElse(uri)
-
       }
     }
 
   protected[client] def getLinkHeader(uri: Uri): Task[List[String]] =
-    gh.use(backend =>
-      basicRequest
-        .headers(getHeaders(token): _*)
-        .head(uri)
-        .send(backend)
-        .map(_.headers("link").toList)
-    )
+    basicRequest
+      .headers(getHeaders(token): _*)
+      .head(uri)
+      .send(backend)
+      .map(_.headers("link").toList)
 
   /** Generic sttp call to the Github API, will fail on any non-2xx response
     * @param uri
     * @tparam A
     * @return
     */
-  protected[client] def call[A: Encoder: Decoder](uri: Uri): Task[List[A]] = {
-    gh.use { backend =>
-      basicRequest
-        .get(uri)
-        .readTimeout(30.seconds)
-        .headers(getHeaders(token): _*)
-        .response(asJson[List[A]])
-        .send(backend)
-    }.pipe(handleResponse)
+  private def call[A: Encoder: Decoder](uri: Uri): Task[List[A]] = {
+    basicRequest
+      .get(uri)
+      .readTimeout(30.seconds)
+      .headers(getHeaders(token): _*)
+      .response(asJson[List[A]])
+      .send(backend)
+      .pipe(handleResponse)
   }
 }
 
-object GithubAPI {
+object GithubApi {
   private val logger = LoggerFactory.getLogger(this.getClass)
 
   val api = "https://api.github.com"
