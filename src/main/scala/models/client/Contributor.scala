@@ -39,7 +39,7 @@ object ContributorSorts {
       val byContributions = y.contributions.compareTo(x.contributions) // descending numeric
 
       if (byContributions == 0)
-        x.login.compareTo(y.login) // descendng alphabetical
+        x.login.compareTo(y.login) // descending alphabetical
       else
         byContributions
     }

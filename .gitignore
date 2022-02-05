@@ -51,3 +51,5 @@ project/plugins/project/
 .bloop/
 project/metals.sbt
 
+## Environment variables
+.envrc

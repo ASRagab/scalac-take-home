@@ -31,4 +31,13 @@ object Handler {
         }
     }
   }
+
+  def handleGetRateLimit: ZIO[GithubService, Throwable, Response] = {
+    ZIO.serviceWithZIO[GithubService] { client =>
+      client.getRateLimit
+        .map { rateLimit =>
+          Response.json(rateLimit.asJson.spaces2)
+        }
+    }
+  }
 }

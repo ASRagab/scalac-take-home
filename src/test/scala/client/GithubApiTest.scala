@@ -3,6 +3,7 @@ package client
 import sttp.client3._
 import sttp.client3.asynchttpclient.zio.AsyncHttpClientZioBackend
 import sttp.model.{Header, StatusCode}
+import utils.Logging
 import zio.ZIO
 import zio.test.Assertion._
 import zio.test._
@@ -28,7 +29,7 @@ object GithubApiTest extends DefaultRunnableSpec {
     .whenRequestMatches(_.uri.path.contains("empty"))
     .thenRespondF(_ => ZIO.succeed(Response[String](body = "", code = StatusCode.Ok, statusText = "Ok")))
 
-  val githubApi = new GithubApi(stub, Some("token"))
+  val githubApi = new GithubApi(stub, Some("token"), Logging())
   val expected  = uri"https://api.github.com/repositories/370657256/contributors?per_page=100&page=3"
 
   val testUri = uri"https://api.github.com/repos/zio"

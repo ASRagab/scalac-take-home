@@ -3,6 +3,7 @@ package server.services
 import client._
 import sttp.client3.asynchttpclient.zio.AsyncHttpClientZioBackend
 import sttp.client3.logging.slf4j.Slf4jLoggingBackend
+import utils.Logging
 import zio._
 
 case class EnvConfig(token: Option[String])
@@ -26,10 +27,13 @@ object Client {
 case class Backend(githubApi: GithubApi)
 
 object Backend {
-  val live: URLayer[Client with EnvConfig, Task[Backend]] = ZLayer {
+  val live: ZLayer[Logging with EnvConfig with Client, Throwable, Backend] = ZLayer {
     for {
-      client <- ZIO.service[Client]
-      env    <- ZIO.service[EnvConfig]
-    } yield client.http.flatMap(backend => ZIO.attempt(Backend(new GithubApi(backend, env.token))))
+      client  <- ZIO.service[Client]
+      env     <- ZIO.service[EnvConfig]
+      logging <- ZIO.service[Logging]
+      http    <- client.http
+      backend <- ZIO.attempt(Backend(new GithubApi(http, env.token, logging)))
+    } yield backend
   }
 }

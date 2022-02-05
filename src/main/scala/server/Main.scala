@@ -1,6 +1,7 @@
 package server
 
 import server.services.{Backend, Client, EnvConfig, GithubService}
+import utils.Logging
 import zhttp.http._
 import zhttp.service.server.ServerChannelFactory
 import zhttp.service.{EventLoopGroup, Server}
@@ -12,14 +13,13 @@ object Main extends ZIOAppDefault {
     .collectZIO[Request] {
       case Method.GET -> !! / "org" / orgName / "contributors" => Handler.handleGetAllContributors(orgName)
       case Method.GET -> !! / "org" / orgName / "repos"        => Handler.handleGetAllRepos(orgName)
+      case Method.GET -> !! / "api" / "rateLimit"              => Handler.handleGetRateLimit
     }
     .orElse(Http.notFound)
 
-  private val port = 8080
-  private val server =
-    Server.app(app).withPort(port)
+  private val server = Server.app(app).withPort(8080)
 
-  override def run =
+  override def run: ZIO[ZEnv, Throwable, Nothing] =
     server.make
       .use { start =>
         Console.printLine(s"Server started on port ${start.port}") *> ZIO.never
@@ -29,9 +29,8 @@ object Main extends ZIOAppDefault {
         ServerChannelFactory.auto,
         EnvConfig.live,
         Client.live,
+        Logging.live,
         Backend.live,
         GithubService.live
       )
-      .exitCode
-
 }

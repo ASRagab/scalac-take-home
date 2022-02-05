@@ -6,9 +6,13 @@ lazy val zioVersion        = "2.0.0-RC1"
 lazy val circeVersion      = "0.14.1"
 lazy val sttpClientVersion = "3.4.1"
 
+addCommandAlias("precommit", ";clean;compile;scalafix;scalafmtAll;test")
+
 lazy val root = (project in file("."))
   .settings(
-    name := "github-project",
+    semanticdbEnabled         := true,
+    semanticdbVersion         := scalafixSemanticdb.revision,
+    name                      := "github-project",
     libraryDependencies ++= Seq(
       "dev.zio"                       %% "zio"                           % zioVersion,
       "dev.zio"                       %% "zio-interop-cats"              % "3.2.9.0",
@@ -24,5 +28,6 @@ lazy val root = (project in file("."))
       "ch.qos.logback"                 % "logback-classic"               % "1.2.10"
     ),
     Compile / run / mainClass := Some("server.Main"),
+    scalacOptions += "-Ywarn-unused:imports",
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
   )
