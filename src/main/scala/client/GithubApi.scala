@@ -40,18 +40,26 @@ class GithubApi(backend: HttpBackend, token: Option[String], logger: Logging) {
       repos            <- getAllRepos(orgName)
       nonEmptyRepos     = repos.filter(_.size > 0)
       contributorPages <-
-        Task.foreachParN(taskParallelism)(nonEmptyRepos)(repo => getAllContributorPages(orgName, repo.name))
+        Task
+          .foreachPar(nonEmptyRepos)(repo => getAllContributorPages(orgName, repo.name))
+          .withParallelism(taskParallelism)
       tracker          <- Ref.make(0)
-      contributors     <- Task.foreachParN(taskParallelism)(contributorPages.flatten) { page =>
-                            call[List[Contributor]](page) <* reportProgress(orgName, contributorPages.flatten.size, tracker)
-                          }
+      contributors     <- Task
+                            .foreachPar(contributorPages.flatten) { page =>
+                              call[List[Contributor]](page) <* reportProgress(
+                                orgName,
+                                contributorPages.flatten.size,
+                                tracker
+                              )
+                            }
+                            .withParallelism(taskParallelism)
     } yield contributors.flatten
 
   def getAllRepos(orgName: String): Task[List[Repo]] =
     for {
       lastPage <- getLastPage(reposUri(orgName))
       pages    <- Task.succeed(getAllPages(lastPage, perPage = defaultPerPage))
-      repos    <- Task.foreachParN(taskParallelism)(pages)(page => call[List[Repo]](page))
+      repos    <- Task.foreachPar(pages)(page => call[List[Repo]](page)).withParallelism(taskParallelism)
     } yield repos.flatten
 
   def getRateLimit: Task[RateLimit] = call[RateLimit](rateLimitUri)
