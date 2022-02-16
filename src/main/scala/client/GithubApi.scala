@@ -23,10 +23,7 @@ class GithubApi(backend: HttpBackend, token: Option[String], logger: Logging) {
     for {
       c      <- current.updateAndGet(_ + 1)
       percent = (c * 100) / total
-      _      <- if (percent % 5 == 0) // report every 5%
-                  Task.succeed(log.info(s"contributors fetched for $orgName: $percent%"))
-                else
-                  Task.unit
+      _      <- Task.succeed(log.info(s"contributors fetched for $orgName: $percent%")).when(percent % 5 == 0)
     } yield ()
   }
 
@@ -43,12 +40,13 @@ class GithubApi(backend: HttpBackend, token: Option[String], logger: Logging) {
         Task
           .foreachPar(nonEmptyRepos)(repo => getAllContributorPages(orgName, repo.name))
           .withParallelism(taskParallelism)
+      flattened         = contributorPages.flatten
       tracker          <- Ref.make(0)
       contributors     <- Task
-                            .foreachPar(contributorPages.flatten) { page =>
+                            .foreachPar(flattened) { page =>
                               call[List[Contributor]](page) <* reportProgress(
                                 orgName,
-                                contributorPages.flatten.size,
+                                flattened.size,
                                 tracker
                               )
                             }
@@ -127,11 +125,11 @@ class GithubApi(backend: HttpBackend, token: Option[String], logger: Logging) {
       .headers(getHeaders(token): _*)
       .response(asJson[A])
       .send(backend)
-      .pipe(handleResponse)
+      .pipe(handleResponse[A])
   }
 
   // TODO: Handle response such that certain status codes are not always failures and return and empty A instead
-  private def handleResponse[A](
+  private def handleResponse[A: Encoder: Decoder](
       responseZIO: Task[Response[Either[ResponseException[String, circe.Error], A]]]
   ): Task[A] =
     responseZIO.flatMap(response =>

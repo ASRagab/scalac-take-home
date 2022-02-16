@@ -13,7 +13,7 @@ object Main extends ZIOAppDefault {
     .collectZIO[Request] {
       case Method.GET -> !! / "org" / orgName / "contributors" => Handler.handleGetAllContributors(orgName)
       case Method.GET -> !! / "org" / orgName / "repos"        => Handler.handleGetAllRepos(orgName)
-      case Method.GET -> !! / "api" / "rateLimit"              => Handler.handleGetRateLimit
+      case Method.GET -> !! / "api" / "rate-limit"             => Handler.handleGetRateLimit
     }
     .orElse(Http.notFound)
 
