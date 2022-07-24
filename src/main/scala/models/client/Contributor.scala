@@ -1,5 +1,6 @@
 package models.client
 
+import io.circe.Codec
 import io.circe.generic.semiauto._
 import models.server.ContributorCount
 
@@ -11,10 +12,9 @@ case class Contributor(
 )
 
 object Contributor {
-  implicit val userDecoder = deriveDecoder[Contributor]
-  implicit val userEncoder = deriveEncoder[Contributor]
+  implicit val contributorCodec: Codec.AsObject[Contributor] = deriveCodec[Contributor]
 
-  def mergeAndSort(contributors: List[Contributor])(implicit ord: Ordering[Contributor]) =
+  def mergeAndSort(contributors: List[Contributor])(implicit ord: Ordering[Contributor]): List[Contributor] =
     contributors
       .groupBy(_.id)
       .map { case (id, contributors) =>
@@ -29,19 +29,17 @@ object Contributor {
       .sorted
 
   implicit class ContributorOps(private val contributor: Contributor) extends AnyVal {
-    def toContributorCount = ContributorCount(contributor.login, contributor.contributions)
+    def toContributorCount: ContributorCount = ContributorCount(contributor.login, contributor.contributions)
   }
 }
 
 object ContributorSorts {
-  implicit val defaultSort = new Ordering[Contributor] {
-    override def compare(x: Contributor, y: Contributor): Int = {
-      val byContributions = y.contributions.compareTo(x.contributions) // descending numeric
+  implicit val defaultSort: Ordering[Contributor] = (x: Contributor, y: Contributor) => {
+    val byContributions = y.contributions.compareTo(x.contributions) // descending numeric
 
-      if (byContributions == 0)
-        x.login.compareTo(y.login) // descending alphabetical
-      else
-        byContributions
-    }
+    if (byContributions == 0)
+      x.login.compareTo(y.login) // descending alphabetical
+    else
+      byContributions
   }
 }

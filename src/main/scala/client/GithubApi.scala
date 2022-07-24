@@ -1,6 +1,5 @@
 package client
 
-import client.GithubApi._
 import io.circe
 import io.circe.{Decoder, Encoder}
 import models.client.{Contributor, RateLimit, Repo}
@@ -15,17 +14,20 @@ import scala.util.chaining._
 import scala.util.matching.Regex
 
 case class GithubApi(backend: HttpBackend, config: EnvConfig, logger: Logging) {
+  private val api = "https://api.github.com"
+
+  private val linkExtractor: Regex = raw"(?<=<).*(?=>)".r
+
+  private val authHeader: String => Header = token => Header(HeaderNames.Authorization, s"token $token")
+
+  // Recommended Header https://docs.github.com/en/rest/overview/media-types#request-specific-version
+  private val acceptHeader: Header = Header(HeaderNames.Accept, "application/vnd.github.v3+json")
+
+  private val defaultPerPage = 100
+
   private val log = logger(this.getClass)
 
   private val taskParallelism = 4
-
-  def reportProgress(orgName: String, total: Int, current: Ref[Int]): Task[Unit] = {
-    for {
-      c      <- current.updateAndGet(_ + 1)
-      percent = (c * 100) / total
-      _      <- ZIO.succeed(log.info(s"contributors fetched for $orgName: $percent%")).when(percent % 5 == 0)
-    } yield ()
-  }
 
   /** First retrieve the list of repositories for the given org, then generate a list of page links to
     *
@@ -53,6 +55,10 @@ case class GithubApi(backend: HttpBackend, config: EnvConfig, logger: Logging) {
                             .withParallelism(taskParallelism)
     } yield contributors.flatten
 
+  /** Get all the public repos for the given org
+    * @param orgName
+    * @return
+    */
   def getAllRepos(orgName: String): Task[List[Repo]] =
     for {
       lastPage <- getLastPage(reposUri(orgName))
@@ -60,6 +66,10 @@ case class GithubApi(backend: HttpBackend, config: EnvConfig, logger: Logging) {
       repos    <- ZIO.foreachPar(pages)(page => call[List[Repo]](page)).withParallelism(taskParallelism)
     } yield repos.flatten
 
+  /** Get the rate limit for the current session
+    * @return
+    *   [[RateLimit]]
+    */
   def getRateLimit: Task[RateLimit] = call[RateLimit](rateLimitUri)
 
   protected[client] def getAllContributorPages(orgName: String, repoName: String): Task[List[Uri]] =
@@ -113,6 +123,14 @@ case class GithubApi(backend: HttpBackend, config: EnvConfig, logger: Logging) {
       .send(backend)
       .map(_.headers("link").toList)
 
+  private def reportProgress(orgName: String, total: Int, current: Ref[Int]): Task[Unit] = {
+    for {
+      c      <- current.updateAndGet(_ + 1)
+      percent = (c * 100) / total
+      _      <- ZIO.succeed(log.info(s"contributors fetched for $orgName: $percent%")).when(percent % 5 == 0)
+    } yield ()
+  }
+
   /** Generic sttp call to the Github API, will fail on any non-2xx response
     * @param uri
     * @tparam A
@@ -121,7 +139,7 @@ case class GithubApi(backend: HttpBackend, config: EnvConfig, logger: Logging) {
   private def call[A: Encoder: Decoder](uri: Uri): Task[A] = {
     basicRequest
       .get(uri)
-      .readTimeout(10.seconds)
+      .readTimeout(30.seconds)
       .headers(getHeaders(config.token): _*)
       .response(asJson[A])
       .send(backend)
@@ -140,33 +158,22 @@ case class GithubApi(backend: HttpBackend, config: EnvConfig, logger: Logging) {
           ZIO.fail(error)
       }
     )
-}
 
-object GithubApi {
-
-  val api = "https://api.github.com"
-
-  val linkExtractor: Regex = raw"(?<=<).*(?=>)".r
-
-  val authHeader: String => Header = token => Header(HeaderNames.Authorization, s"token $token")
-
-  // Recommended Header https://docs.github.com/en/rest/overview/media-types#request-specific-version
-  val acceptHeader = Header(HeaderNames.Accept, "application/vnd.github.v3+json")
-
-  val defaultPerPage = 100
-
-  def getHeaders(maybeToken: Option[String]): List[Header] =
+  private def getHeaders(maybeToken: Option[String]): List[Header] =
     maybeToken
       .map(token => List(Header(HeaderNames.Authorization, s"token $token"), acceptHeader))
       .getOrElse(List(acceptHeader))
 
-  def reposUri(orgName: String, page: Int = 1, perPage: Int = defaultPerPage): Uri =
+  private def reposUri(orgName: String, page: Int = 1, perPage: Int = defaultPerPage): Uri =
     uri"$api/orgs/$orgName/repos?per_page=$perPage&page=$page"
 
-  def contributorsUri(orgName: String, repoName: String, page: Int = 1, perPage: Int = defaultPerPage): Uri =
+  private def contributorsUri(orgName: String, repoName: String, page: Int = 1, perPage: Int = defaultPerPage): Uri =
     uri"$api/repos/$orgName/$repoName/contributors?per_page=$perPage&page=$page"
 
-  def rateLimitUri: Uri = uri"$api/rate_limit"
+  private def rateLimitUri: Uri = uri"$api/rate_limit"
+}
 
-  val layer = ZLayer.fromFunction(GithubApi.apply _)
+object GithubApi {
+  val layer: ZLayer[HttpBackend with EnvConfig with Logging, Nothing, GithubApi] =
+    ZLayer.fromFunction(GithubApi.apply _)
 }

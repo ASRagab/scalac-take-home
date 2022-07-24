@@ -1,4 +1,11 @@
-## Github API Take Home
+# Github API Take Home
+
+## Prerequisites
+
+To get contributors from even medium sized orgs, you'll need a github access token and set 
+and environment variable `GH_TOKEN` with the value.
+
+[Github Docs](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token)
 
 
 ## Running
@@ -12,6 +19,15 @@
 
 ```bash
 > sbt test
+```
+
+## Development Server
+
+Thanks to sbt-revolver, we can run the application in development mode
+will watch for source changes and restart the server
+
+```bash
+> export GH_TOKEN=<your-github-token>; sbt "~reStart"
 ```
 
 ## Choices and Regrets

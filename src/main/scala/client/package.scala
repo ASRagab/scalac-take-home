@@ -1,7 +1,7 @@
 import sttp.capabilities.WebSockets
 import sttp.capabilities.zio.ZioStreams
 import sttp.client3.SttpBackend
-import sttp.client3.asynchttpclient.zio.AsyncHttpClientZioBackend
+import sttp.client3.asynchttpclient.zio._
 import sttp.client3.logging.slf4j.Slf4jLoggingBackend
 import zio._
 
@@ -16,14 +16,13 @@ package object client {
   }
 
   object Client {
-    val layer: ZLayer[Any, Throwable, HttpBackend] = {
-      ZLayer.fromZIO(
-        AsyncHttpClientZioBackend()
-          .map(backend =>
-            Slf4jLoggingBackend(backend, logResponseBody = true, logResponseHeaders = false, includeTiming = true)
-          )
-      )
-    }
+    val layer: ZLayer[Any, Throwable, SttpBackend[Task, ZioStreams with WebSockets]] = ZLayer.scoped(
+      AsyncHttpClientZioBackend
+        .scoped()
+        .map(backend =>
+          Slf4jLoggingBackend(backend, logResponseBody = true, logResponseHeaders = false, includeTiming = true)
+        )
+    )
 
   }
 

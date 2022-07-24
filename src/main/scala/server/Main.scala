@@ -15,11 +15,11 @@ object Main extends ZIOAppDefault {
       case Method.GET -> !! / "org" / orgName / "contributors" => Handler.allContributors(orgName)
       case Method.GET -> !! / "org" / orgName / "repos"        => Handler.allRepos(orgName)
       case Method.GET -> !! / "api" / "rate-limit"             => Handler.rateLimit
-      case Method.GET -> !!                                    => Handler.basic
+      case Method.GET -> !!                                    => Handler.healthcheck
     }
     .orElse(Http.notFound)
 
-  private val server = Server.port(8080) ++ Server.app(app)
+  private val server = Server.app(app).withPort(8080)
 
   override def run: ZIO[Any, Throwable, Nothing] =
     server.make

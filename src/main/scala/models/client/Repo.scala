@@ -1,5 +1,6 @@
 package models.client
 
+import io.circe.Codec
 import io.circe.generic.semiauto._
 
 case class Repo(
@@ -10,6 +11,5 @@ case class Repo(
 )
 
 object Repo {
-  implicit val repoEncoder = deriveEncoder[Repo]
-  implicit val repoDecoder = deriveDecoder[Repo]
+  implicit val repoCodec: Codec.AsObject[Repo] = deriveCodec[Repo]
 }

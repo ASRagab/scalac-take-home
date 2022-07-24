@@ -1,6 +1,6 @@
 package server
 
-import models.client.{Basic, Contributor}
+import models.client.{Healthcheck, Contributor}
 import models.client.ContributorSorts._
 import zhttp.http.Response
 import zio.ZIO
@@ -42,7 +42,7 @@ object Handler {
     }
   }
 
-  def basic: ZIO[GithubService, Nothing, Response] = ZIO.serviceWithZIO[GithubService] { _ =>
-    ZIO.succeed(Response.json(Basic(LocalDateTime.now()).asJson.spaces2))
-  }
+  def healthcheck: ZIO[Any, Nothing, Response] =
+    ZIO.succeed(Response.json(Healthcheck(LocalDateTime.now()).asJson.spaces2))
+
 }

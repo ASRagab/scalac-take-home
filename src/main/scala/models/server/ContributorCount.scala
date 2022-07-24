@@ -1,5 +1,6 @@
 package models.server
 
+import io.circe.Codec
 import io.circe.generic.semiauto._
 
 case class ContributorCount(
@@ -8,5 +9,5 @@ case class ContributorCount(
 )
 
 object ContributorCount {
-  implicit val codec = deriveCodec[ContributorCount]
+  implicit val countCodec: Codec.AsObject[ContributorCount] = deriveCodec[ContributorCount]
 }

@@ -8,5 +8,5 @@ case class Logging() extends Function[Class[_], Logger] {
 }
 
 object Logging {
-  val layer = ZLayer.fromFunction(Logging.apply _)
+  val layer: ZLayer[Any, Nothing, Logging] = ZLayer.fromFunction(Logging.apply _)
 }

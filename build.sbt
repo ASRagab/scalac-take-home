@@ -4,7 +4,7 @@ ThisBuild / version      := "0.1.0-SNAPSHOT"
 lazy val zhttpVersion      = "2.0.0-RC10"
 lazy val zioVersion        = "2.0.0"
 lazy val circeVersion      = "0.14.1"
-lazy val sttpClientVersion = "3.6.2"
+lazy val sttpClientVersion = "3.7.1"
 
 addCommandAlias("precommit", ";clean;compile;scalafix;scalafmtAll;test")
 

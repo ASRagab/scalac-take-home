@@ -24,5 +24,5 @@ case class GithubServiceLive(githubApi: GithubApi) extends GithubService {
 }
 
 object GithubService {
-  val layer = ZLayer.fromFunction(GithubServiceLive.apply _)
+  val layer: ZLayer[GithubApi, Nothing, GithubServiceLive] = ZLayer.fromFunction(GithubServiceLive.apply _)
 }
