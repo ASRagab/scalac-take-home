@@ -8,7 +8,5 @@ case class ContributorCount(
 )
 
 object ContributorCount {
-  implicit val decoder = deriveDecoder[ContributorCount]
-  implicit val encoder = deriveEncoder[ContributorCount]
-
+  implicit val codec = deriveCodec[ContributorCount]
 }

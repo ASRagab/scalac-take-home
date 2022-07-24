@@ -8,13 +8,13 @@ import sttp.client3._
 import sttp.client3.circe._
 import sttp.model.{Header, HeaderNames, Uri}
 import utils.Logging
-import zio.{Ref, Task}
+import zio.{Ref, Task, ZIO, ZLayer}
 
 import scala.concurrent.duration._
 import scala.util.chaining._
 import scala.util.matching.Regex
 
-class GithubApi(backend: HttpBackend, token: Option[String], logger: Logging) {
+case class GithubApi(backend: HttpBackend, config: EnvConfig, logger: Logging) {
   private val log = logger(this.getClass)
 
   private val taskParallelism = 4
@@ -23,7 +23,7 @@ class GithubApi(backend: HttpBackend, token: Option[String], logger: Logging) {
     for {
       c      <- current.updateAndGet(_ + 1)
       percent = (c * 100) / total
-      _      <- Task.succeed(log.info(s"contributors fetched for $orgName: $percent%")).when(percent % 5 == 0)
+      _      <- ZIO.succeed(log.info(s"contributors fetched for $orgName: $percent%")).when(percent % 5 == 0)
     } yield ()
   }
 
@@ -37,12 +37,12 @@ class GithubApi(backend: HttpBackend, token: Option[String], logger: Logging) {
       repos            <- getAllRepos(orgName)
       nonEmptyRepos     = repos.filter(_.size > 0)
       contributorPages <-
-        Task
+        ZIO
           .foreachPar(nonEmptyRepos)(repo => getAllContributorPages(orgName, repo.name))
           .withParallelism(taskParallelism)
       flattened         = contributorPages.flatten
       tracker          <- Ref.make(0)
-      contributors     <- Task
+      contributors     <- ZIO
                             .foreachPar(flattened) { page =>
                               call[List[Contributor]](page) <* reportProgress(
                                 orgName,
@@ -56,8 +56,8 @@ class GithubApi(backend: HttpBackend, token: Option[String], logger: Logging) {
   def getAllRepos(orgName: String): Task[List[Repo]] =
     for {
       lastPage <- getLastPage(reposUri(orgName))
-      pages    <- Task.succeed(getAllPages(lastPage, perPage = defaultPerPage))
-      repos    <- Task.foreachPar(pages)(page => call[List[Repo]](page)).withParallelism(taskParallelism)
+      pages    <- ZIO.succeed(getAllPages(lastPage, perPage = defaultPerPage))
+      repos    <- ZIO.foreachPar(pages)(page => call[List[Repo]](page)).withParallelism(taskParallelism)
     } yield repos.flatten
 
   def getRateLimit: Task[RateLimit] = call[RateLimit](rateLimitUri)
@@ -65,7 +65,7 @@ class GithubApi(backend: HttpBackend, token: Option[String], logger: Logging) {
   protected[client] def getAllContributorPages(orgName: String, repoName: String): Task[List[Uri]] =
     for {
       lastPage <- getLastPage(contributorsUri(orgName, repoName, perPage = defaultPerPage))
-      pages    <- Task.succeed(getAllPages(lastPage, perPage = defaultPerPage))
+      pages    <- ZIO.succeed(getAllPages(lastPage, perPage = defaultPerPage))
     } yield pages
 
   /** Extracts the last page number from the uri and then generates all page links by ranging from 1 to the last page.
@@ -108,7 +108,7 @@ class GithubApi(backend: HttpBackend, token: Option[String], logger: Logging) {
     */
   protected[client] def getLinkHeader(uri: Uri): Task[List[String]] =
     basicRequest
-      .headers(getHeaders(token): _*)
+      .headers(getHeaders(config.token): _*)
       .head(uri)
       .send(backend)
       .map(_.headers("link").toList)
@@ -121,8 +121,8 @@ class GithubApi(backend: HttpBackend, token: Option[String], logger: Logging) {
   private def call[A: Encoder: Decoder](uri: Uri): Task[A] = {
     basicRequest
       .get(uri)
-      .readTimeout(30.seconds)
-      .headers(getHeaders(token): _*)
+      .readTimeout(10.seconds)
+      .headers(getHeaders(config.token): _*)
       .response(asJson[A])
       .send(backend)
       .pipe(handleResponse[A])
@@ -134,10 +134,10 @@ class GithubApi(backend: HttpBackend, token: Option[String], logger: Logging) {
   ): Task[A] =
     responseZIO.flatMap(response =>
       response.body match {
-        case Right(a)    => Task.succeed(a)
+        case Right(a)    => ZIO.succeed(a)
         case Left(error) =>
-          log.error(s"Error: ${response.request.uri} | ${error}")
-          Task.fail(error)
+          log.error(s"Error: ${response.request.uri} | $error")
+          ZIO.fail(error)
       }
     )
 }
@@ -168,4 +168,5 @@ object GithubApi {
 
   def rateLimitUri: Uri = uri"$api/rate_limit"
 
+  val layer = ZLayer.fromFunction(GithubApi.apply _)
 }

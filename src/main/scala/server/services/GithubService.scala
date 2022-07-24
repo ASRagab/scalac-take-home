@@ -1,7 +1,8 @@
 package server.services
 
-import models.client._
 import zio._
+import models.client._
+import client.GithubApi
 
 trait GithubService {
   protected[server] def getContributors(orgName: String): Task[List[Contributor]]
@@ -11,20 +12,17 @@ trait GithubService {
   protected[server] def getRateLimit: Task[RateLimit]
 }
 
+case class GithubServiceLive(githubApi: GithubApi) extends GithubService {
+  override protected[server] def getContributors(orgName: String): Task[List[Contributor]] =
+    githubApi.getAllContributors(orgName)
+
+  override protected[server] def getRepos(orgName: String): Task[List[Repo]] =
+    githubApi.getAllRepos(orgName)
+
+  override protected[server] def getRateLimit: Task[RateLimit] =
+    githubApi.getRateLimit
+}
+
 object GithubService {
-  val live = ZLayer {
-    ZIO.service[Backend].map { backend =>
-      new GithubService {
-
-        protected[server] def getContributors(orgName: String): Task[List[Contributor]] =
-          backend.githubApi.getAllContributors(orgName)
-
-        protected[server] def getRepos(orgName: String): Task[List[Repo]] =
-          backend.githubApi.getAllRepos(orgName)
-
-        protected[server] def getRateLimit: Task[RateLimit] =
-          backend.githubApi.getRateLimit
-      }
-    }
-  }
+  val layer = ZLayer.fromFunction(GithubServiceLive.apply _)
 }
