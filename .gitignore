@@ -51,3 +51,8 @@ project/plugins/project/
 .bloop/
 project/metals.sbt
 
+## Environment variables
+.envrc
+
+# BSP
+.bsp/sbt.json

@@ -1,25 +1,28 @@
 package server.services
 
-import models.client.{Contributor, Repo}
 import zio._
+import models.client._
+import client.GithubApi
 
 trait GithubService {
   protected[server] def getContributors(orgName: String): Task[List[Contributor]]
 
   protected[server] def getRepos(orgName: String): Task[List[Repo]]
+
+  protected[server] def getRateLimit: Task[RateLimit]
+}
+
+case class GithubServiceLive(githubApi: GithubApi) extends GithubService {
+  override protected[server] def getContributors(orgName: String): Task[List[Contributor]] =
+    githubApi.getAllContributors(orgName)
+
+  override protected[server] def getRepos(orgName: String): Task[List[Repo]] =
+    githubApi.getAllRepos(orgName)
+
+  override protected[server] def getRateLimit: Task[RateLimit] =
+    githubApi.getRateLimit
 }
 
 object GithubService {
-  val live = ZLayer {
-    for {
-      backend <- ZIO.service[Task[Backend]]
-    } yield new GithubService {
-
-      protected[server] def getContributors(orgName: String): Task[List[Contributor]] =
-        backend.toManaged.use(_.githubApi.getAllContributors(orgName))
-
-      protected[server] def getRepos(orgName: String): Task[List[Repo]] =
-        backend.toManaged.use(_.githubApi.getAllRepos(orgName))
-    }
-  }
+  val layer: ZLayer[GithubApi, Nothing, GithubServiceLive] = ZLayer.fromFunction(GithubServiceLive.apply _)
 }

@@ -1,16 +1,17 @@
 package server
 
-import models.client.Contributor
+import models.client.{Healthcheck, Contributor}
 import models.client.ContributorSorts._
 import zhttp.http.Response
 import zio.ZIO
 import io.circe.syntax._
 import server.services.GithubService
 
+import java.time.LocalDateTime
 import scala.util.chaining._
 
 object Handler {
-  def handleGetAllContributors(orgName: String): ZIO[GithubService, Throwable, Response] = {
+  def allContributors(orgName: String): ZIO[GithubService, Throwable, Response] = {
     ZIO.serviceWithZIO[GithubService] { client =>
       client
         .getContributors(orgName)
@@ -22,7 +23,7 @@ object Handler {
     }
   }
 
-  def handleGetAllRepos(orgName: String): ZIO[GithubService, Throwable, Response] = {
+  def allRepos(orgName: String): ZIO[GithubService, Throwable, Response] = {
     ZIO.serviceWithZIO[GithubService] { client =>
       client
         .getRepos(orgName)
@@ -31,4 +32,17 @@ object Handler {
         }
     }
   }
+
+  def rateLimit: ZIO[GithubService, Throwable, Response] = {
+    ZIO.serviceWithZIO[GithubService] { client =>
+      client.getRateLimit
+        .map { rateLimit =>
+          Response.json(rateLimit.asJson.spaces2)
+        }
+    }
+  }
+
+  def healthcheck: ZIO[Any, Nothing, Response] =
+    ZIO.succeed(Response.json(Healthcheck(LocalDateTime.now()).asJson.spaces2))
+
 }

@@ -1,6 +1,8 @@
 package server
 
-import server.services.{Backend, Client, EnvConfig, GithubService}
+import client.{Client, EnvConfig, GithubApi}
+import server.services.GithubService
+import utils.Logging
 import zhttp.http._
 import zhttp.service.server.ServerChannelFactory
 import zhttp.service.{EventLoopGroup, Server}
@@ -10,28 +12,28 @@ object Main extends ZIOAppDefault {
 
   val app: Http[GithubService, Throwable, Request, Response] = Http
     .collectZIO[Request] {
-      case Method.GET -> !! / "org" / orgName / "contributors" => Handler.handleGetAllContributors(orgName)
-      case Method.GET -> !! / "org" / orgName / "repos"        => Handler.handleGetAllRepos(orgName)
+      case Method.GET -> !! / "org" / orgName / "contributors" => Handler.allContributors(orgName)
+      case Method.GET -> !! / "org" / orgName / "repos"        => Handler.allRepos(orgName)
+      case Method.GET -> !! / "api" / "rate-limit"             => Handler.rateLimit
+      case Method.GET -> !!                                    => Handler.healthcheck
     }
     .orElse(Http.notFound)
 
-  private val port = 8080
-  private val server =
-    Server.app(app).withPort(port)
+  private val server = Server.app(app).withPort(8080)
 
-  override def run =
+  override def run: ZIO[Any, Throwable, Nothing] =
     server.make
-      .use { start =>
+      .flatMap { start =>
         Console.printLine(s"Server started on port ${start.port}") *> ZIO.never
       }
-      .provideCustom(
+      .provide(
         EventLoopGroup.auto(),
         ServerChannelFactory.auto,
-        EnvConfig.live,
-        Client.live,
-        Backend.live,
-        GithubService.live
+        Scope.default,
+        Logging.layer,
+        EnvConfig.layer,
+        Client.layer,
+        GithubApi.layer,
+        GithubService.layer
       )
-      .exitCode
-
 }
